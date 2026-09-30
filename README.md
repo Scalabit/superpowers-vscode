@@ -30,6 +30,7 @@ Everything lands in `$HOME`. **No project repository is modified.**
 | Skills | `~/.copilot/skills` → symlink to the clone's `skills/` |
 | Hook | `~/.copilot/hooks/superpowers.json` |
 | Settings | `chat.useAgentSkills` and `chat.useHooks` set to `true` |
+| Git | `docs/superpowers/` and `.superpowers/` added to your global gitignore |
 
 `~/.copilot/skills` and `~/.copilot/hooks` are user-level locations VS Code scans in *every*
 workspace, so one install covers all your projects.
@@ -38,6 +39,26 @@ The settings step patches whichever files exist — `~/.vscode-server/data/Machi
 for Remote-SSH, `~/.config/Code/User/settings.json` for Linux, the Insiders and macOS paths
 too. It backs up before writing, and if a settings file contains comments or trailing commas
 it refuses to edit and tells you to set the flags by hand rather than corrupting the file.
+
+## Keeping specs and plans out of git
+
+The workflow writes design docs and plans into `docs/superpowers/` of whichever project you
+are working in, and the `brainstorming` skill explicitly tells the agent to commit them. That
+is rarely what you want in a shared repository.
+
+The installer adds `docs/superpowers/` and `.superpowers/` to your global gitignore — either
+the file named by `core.excludesFile`, or `~/.config/git/ignore`, which git reads by default.
+The artifacts still land next to your code where they are useful, they just never enter the
+tree. Nothing in any project repository is edited, and the patterns are appended only if
+missing, so re-running is safe.
+
+```bash
+SUPERPOWERS_SKIP_GITIGNORE=1 ./install.sh   # if you would rather commit them
+```
+
+One limit: gitignore has no effect on files git already tracks. If a repo already commits
+`docs/superpowers/`, untracking it takes `git rm --cached -r docs/superpowers` — a commit
+that removes the files for everyone, so agree it with your team first.
 
 ## How skills reach the agent
 
@@ -77,6 +98,9 @@ SUPERPOWERS_VERSION=v6.5.0 ./install.sh   # move to another version
 ./install.sh                              # re-run to repair
 ./install.sh --uninstall                  # unlink skills and remove the hook
 ```
+
+`--uninstall` leaves the clone, the VS Code settings flags and the gitignore entries alone;
+remove those by hand if you want them gone.
 
 The version is pinned in `install.sh` rather than tracking `main`, so a team stays on one
 release. Bump it deliberately.

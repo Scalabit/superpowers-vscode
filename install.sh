@@ -8,6 +8,8 @@
 #   ./install.sh                                # install or repair
 #   SUPERPOWERS_VERSION=v6.5.0 ./install.sh     # move to a different version
 #   ./install.sh --uninstall                    # remove the wiring
+#
+# Set SUPERPOWERS_SKIP_GITIGNORE=1 to keep specs and plans committable.
 
 set -euo pipefail
 
@@ -29,6 +31,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
   [[ -f "${HOOK_FILE}" ]] && rm -f "${HOOK_FILE}" && note "removed ${HOOK_FILE}"
   note "clone left at ${CLONE_DIR} - delete it by hand if you want it gone"
   note "chat.useAgentSkills / chat.useHooks left enabled in your VS Code settings"
+  note "global gitignore entries left in place - remove them by hand if unwanted"
   exit 0
 fi
 
@@ -149,6 +152,40 @@ if [[ "$patched" -eq 0 ]]; then
         "chat.useAgentSkills": true,
         "chat.useHooks": true
 EOF
+fi
+
+# Superpowers writes specs and plans into docs/superpowers/ of whatever project
+# you happen to be in, and tells the agent to commit them. Listing the paths in
+# the global gitignore keeps them out of every repo without editing any of them.
+if [[ -z "${SUPERPOWERS_SKIP_GITIGNORE:-}" ]]; then
+  log "Keeping docs/superpowers/ out of git"
+  configured=$(git config --global --get core.excludesFile || true)
+  if [[ -n "${configured}" ]]; then
+    ignore_file="${configured/#\~/${HOME}}"
+  else
+    ignore_file="${XDG_CONFIG_HOME:-${HOME}/.config}/git/ignore"
+  fi
+
+  mkdir -p "$(dirname "${ignore_file}")"
+  touch "${ignore_file}"
+
+  appended=0
+  for pattern in 'docs/superpowers/' '.superpowers/'; do
+    grep -qxF "${pattern}" "${ignore_file}" && continue
+    if [[ "${appended}" -eq 0 ]]; then
+      printf '\n# Superpowers working artifacts - kept local, never committed\n' >> "${ignore_file}"
+      appended=1
+    fi
+    printf '%s\n' "${pattern}" >> "${ignore_file}"
+  done
+
+  if [[ "${appended}" -eq 1 ]]; then
+    note "added patterns to ${ignore_file}"
+  else
+    note "already listed in ${ignore_file}"
+  fi
+  # Ignore rules never apply to files git is already tracking.
+  note "already-committed docs/superpowers/ needs 'git rm --cached -r' to untrack"
 fi
 
 cat <<'EOF'
